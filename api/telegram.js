@@ -1,4 +1,4 @@
-const { handleTelegramUpdate } = require("../src/telegram-agent");
+const { handleTelegramUpdate } = require("../public/src/telegram-agent");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {

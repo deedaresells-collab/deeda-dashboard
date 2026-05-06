@@ -4,15 +4,17 @@ const {
   reportMessage,
   todayMessage,
   trackingMessage
-} = require("../src/telegram-agent");
+} = require("../public/src/telegram-agent");
 
-console.log("=== /summary ===");
-console.log(reportMessage());
-console.log("\n=== /tracking ===");
-console.log(trackingMessage());
-console.log("\n=== /late ===");
-console.log(lateMessage());
-console.log("\n=== /today ===");
-console.log(todayMessage());
-console.log("\n=== alerts ===");
-console.log(buildAttentionAlerts().slice(0, 20).join("\n") || "No orders need attention right now.");
+(async () => {
+  console.log("=== /summary ===");
+  console.log(await reportMessage());
+  console.log("\n=== /tracking ===");
+  console.log(await trackingMessage());
+  console.log("\n=== /late ===");
+  console.log(await lateMessage());
+  console.log("\n=== /today ===");
+  console.log(await todayMessage());
+  console.log("\n=== alerts ===");
+  console.log((await buildAttentionAlerts()).slice(0, 20).join("\n") || "No orders need attention right now.");
+})();

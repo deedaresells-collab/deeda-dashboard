@@ -1,6 +1,24 @@
+const fs = require("fs");
+const path = require("path");
+
+loadLocalEnv();
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+
+function loadLocalEnv() {
+  for (const fileName of [".env.local", ".env"]) {
+    const envPath = path.join(__dirname, "..", fileName);
+    if (!fs.existsSync(envPath)) continue;
+    for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const [key, ...valueParts] = trimmed.split("=");
+      if (!process.env[key]) process.env[key] = valueParts.join("=").trim();
+    }
+  }
+}
 
 function getSupabaseConfig() {
   if (!SUPABASE_URL) throw new Error("Missing SUPABASE_URL");

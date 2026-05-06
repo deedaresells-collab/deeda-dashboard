@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ORDERS_PATH = path.join(__dirname, "..", "data", "orders.json");
+const { getDashboardOrders } = require("../../api/_orders");
 const ATTENTION_STATUSES = new Set(["Submitted", "Ordered", "Waiting to Ship"]);
 const DONE_STATUSES = new Set(["Shipped", "Delivered", "Completed", "Issue / Refund"]);
 
@@ -24,16 +24,16 @@ function money(value) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0));
 }
 
-function loadOrders() {
-  if (!fs.existsSync(ORDERS_PATH)) return [];
-  return JSON.parse(fs.readFileSync(ORDERS_PATH, "utf8"));
+async function loadOrders() {
+  return getDashboardOrders();
 }
 
 function itemAmounts(item) {
   const qty = Number(item.quantity || 1);
   const revenue = item.lineRevenue != null ? Number(item.lineRevenue || 0) : Number(item.salePrice || 0) * qty;
   const cost = item.lineCost != null ? Number(item.lineCost || 0) : Number(item.productCost || 0) * qty + Number(item.shippingCost || 0);
-  return { qty, revenue, cost, profit: revenue - cost };
+  const profit = item.lineProfit != null ? Number(item.lineProfit || 0) : revenue - cost;
+  return { qty, revenue, cost, profit };
 }
 
 function orderTotals(order) {
@@ -81,13 +81,13 @@ function isAttentionStatus(order) {
   return ATTENTION_STATUSES.has(order.status);
 }
 
-function missingTrackingOrders(orders = loadOrders()) {
+function missingTrackingOrders(orders) {
   return orders
     .filter((order) => isAttentionStatus(order) && !String(order.trackingNumber || "").trim())
     .sort((a, b) => daysOld(b.date) - daysOld(a.date) || Number(b.id) - Number(a.id));
 }
 
-function lateOrders(orders = loadOrders()) {
+function lateOrders(orders) {
   return orders
     .filter((order) => isAttentionStatus(order) && daysOld(order.date) > 3)
     .sort((a, b) => daysOld(b.date) - daysOld(a.date) || Number(b.id) - Number(a.id));
@@ -99,7 +99,7 @@ function formatOrderLine(order, includeProfit = true) {
   return includeProfit ? `${base} - ${money(totals.profit)} profit` : `${base}`;
 }
 
-function todayActivity(orders = loadOrders()) {
+function todayActivity(orders) {
   const today = todayKey();
   return {
     newOrders: orders.filter((order) => order.date === today),
@@ -108,8 +108,8 @@ function todayActivity(orders = loadOrders()) {
   };
 }
 
-function reportMessage() {
-  const orders = loadOrders();
+async function reportMessage() {
+  const orders = await loadOrders();
   const todayOrders = orders.filter((order) => order.date === todayKey());
   const monthOrders = orders.filter((order) => order.date.startsWith(monthKey()));
   const daily = totalsFor(todayOrders);
@@ -149,8 +149,8 @@ function reportMessage() {
     .trim();
 }
 
-function trackingMessage() {
-  const orders = missingTrackingOrders();
+async function trackingMessage() {
+  const orders = missingTrackingOrders(await loadOrders());
   return [
     "Orders Missing Tracking",
     "",
@@ -158,8 +158,8 @@ function trackingMessage() {
   ].join("\n");
 }
 
-function lateMessage() {
-  const orders = lateOrders();
+async function lateMessage() {
+  const orders = lateOrders(await loadOrders());
   return [
     "Orders Waiting Too Long",
     "",
@@ -169,8 +169,8 @@ function lateMessage() {
   ].join("\n");
 }
 
-function todayMessage() {
-  const orders = loadOrders().filter((order) => order.date === todayKey());
+async function todayMessage() {
+  const orders = (await loadOrders()).filter((order) => order.date === todayKey());
   const totals = totalsFor(orders);
   return ["Today", "", `Revenue: ${money(totals.revenue)}`, `Profit: ${money(totals.profit)}`, `Orders: ${totals.orders}`].join("\n");
 }
@@ -187,7 +187,8 @@ function helpMessage() {
   ].join("\n");
 }
 
-function buildAttentionAlerts(orders = loadOrders()) {
+async function buildAttentionAlerts(orders = null) {
+  if (!orders) orders = await loadOrders();
   const alerts = [];
   for (const order of missingTrackingOrders(orders)) {
     alerts.push(`Order #${order.id} (${order.customerName}) is missing tracking.`);
@@ -223,7 +224,7 @@ async function handleTelegramUpdate(update) {
     "/today": todayMessage,
     "/help": helpMessage
   };
-  const reply = replies[command] ? replies[command]() : helpMessage();
+  const reply = replies[command] ? await replies[command]() : helpMessage();
   await sendTelegramMessage(reply, chatId);
   return { ok: true };
 }

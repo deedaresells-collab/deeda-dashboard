@@ -1,4 +1,4 @@
-const { dailySummaryMessage, sendTelegramMessage } = require("../src/telegram-agent");
+const { dailySummaryMessage, sendTelegramMessage } = require("../public/src/telegram-agent");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
@@ -6,7 +6,7 @@ module.exports = async function handler(req, res) {
     return;
   }
   try {
-    await sendTelegramMessage(dailySummaryMessage());
+    await sendTelegramMessage(await dailySummaryMessage());
     res.status(200).json({ ok: true });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });

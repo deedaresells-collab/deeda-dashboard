@@ -1,6 +1,6 @@
-const { dailySummaryMessage, sendTelegramMessage } = require("../src/telegram-agent");
+const { dailySummaryMessage, sendTelegramMessage } = require("../public/src/telegram-agent");
 
-sendTelegramMessage(dailySummaryMessage())
+(async () => sendTelegramMessage(await dailySummaryMessage()))()
   .then(() => {
     console.log("Daily Telegram summary sent.");
   })

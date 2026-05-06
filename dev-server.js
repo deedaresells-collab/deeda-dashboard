@@ -5,9 +5,9 @@ const path = require("path");
 const root = path.join(__dirname, "public");
 const port = process.env.PORT || 4173;
 const dataDir = path.join(__dirname, "data");
-const ordersFile = path.join(dataDir, "orders.json");
 const productsFile = path.join(dataDir, "products.json");
 const telegramAgent = require("./public/src/telegram-agent");
+const { getDashboardOrders } = require("./api/_orders");
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -72,43 +72,21 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/api/orders" && req.method === "GET") {
-    fs.readFile(ordersFile, "utf8", (error, data) => {
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(error ? "[]" : data);
-    });
+    getDashboardOrders()
+      .then((orders) => {
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(orders));
+      })
+      .catch((error) => {
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: error.message }));
+      });
     return;
   }
 
   if (req.url === "/api/orders" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > 20_000_000) req.destroy();
-    });
-    req.on("end", () => {
-      try {
-        JSON.parse(body);
-        fs.mkdir(dataDir, { recursive: true }, (mkdirError) => {
-          if (mkdirError) {
-            res.writeHead(500);
-            res.end("Could not create data folder");
-            return;
-          }
-          fs.writeFile(ordersFile, body, "utf8", (writeError) => {
-            if (writeError) {
-              res.writeHead(500);
-              res.end("Could not save orders");
-              return;
-            }
-            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-            res.end("{\"ok\":true}");
-          });
-        });
-      } catch {
-        res.writeHead(400);
-        res.end("Invalid JSON");
-      }
-    });
+    res.writeHead(405, { "Content-Type": "application/json; charset=utf-8" });
+    res.end("{\"ok\":false,\"error\":\"Orders are read from Supabase dashboard_orders.\"}");
     return;
   }
 
@@ -132,8 +110,8 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/api/telegram/daily" && req.method === "POST") {
-    telegramAgent
-      .sendTelegramMessage(telegramAgent.dailySummaryMessage())
+    Promise.resolve()
+      .then(async () => telegramAgent.sendTelegramMessage(await telegramAgent.dailySummaryMessage()))
       .then(() => {
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         res.end("{\"ok\":true}");

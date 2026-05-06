@@ -37,10 +37,10 @@
   function orderTotals(order) {
     return order.items.reduce(
       (totals, item) => {
-        const { revenue, cost } = itemAmounts(item);
+        const { revenue, cost, profit } = itemAmounts(item);
         totals.revenue += revenue;
         totals.cost += cost;
-        totals.profit += revenue - cost;
+        totals.profit += profit;
         totals.qty += Number(item.quantity || 1);
         return totals;
       },
@@ -52,7 +52,8 @@
     const qty = Number(item.quantity || 1);
     const revenue = item.lineRevenue != null ? Number(item.lineRevenue || 0) : Number(item.salePrice || 0) * qty;
     const cost = item.lineCost != null ? Number(item.lineCost || 0) : Number(item.productCost || 0) * qty + Number(item.shippingCost || 0);
-    return { qty, revenue, cost, profit: revenue - cost };
+    const profit = item.lineProfit != null ? Number(item.lineProfit || 0) : revenue - cost;
+    return { qty, revenue, cost, profit };
   }
 
   function margin(revenue, profit) {
@@ -65,9 +66,7 @@
   }
 
   function loadOrders() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-    return window.DEEDA_SEED.orders;
+    return [];
   }
 
   function saveOrders() {
@@ -82,15 +81,15 @@
   async function hydrateOrdersFromServer() {
     try {
       let response = await fetch("/api/orders", { cache: "no-store" });
-      if (!response.ok) response = await fetch("/data/orders.json", { cache: "no-store" });
+      if (!response.ok) throw new Error("Orders API failed");
       const serverOrders = await response.json();
-      if (Array.isArray(serverOrders) && serverOrders.length) {
+      if (Array.isArray(serverOrders)) {
         orders = serverOrders;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
         render();
       }
     } catch {
-      // Local-only fallback stays available when the server API is not running.
+      orders = [];
+      render();
     }
   }
 

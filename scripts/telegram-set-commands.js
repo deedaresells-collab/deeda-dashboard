@@ -1,4 +1,4 @@
-require("../src/telegram-agent");
+require("../public/src/telegram-agent");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
