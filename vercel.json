@@ -1,29 +1,13 @@
 {
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "headers": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
-      ]
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/telegram-daily",
-      "schedule": "0 16 * * *"
-    },
-    {
-      "path": "/api/telegram-daily",
-      "schedule": "30 21 * * *"
-    },
-    {
-      "path": "/api/telegram-daily",
-      "schedule": "0 0 * * *"
+      "destination": "/index.html"
     }
   ]
 }
