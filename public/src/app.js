@@ -23,6 +23,7 @@
   let customStart = "";
   let customEnd = "";
   let storeCategory = "All";
+  let orderLoadError = "";
 
   const app = document.getElementById("app");
 
@@ -85,10 +86,12 @@
       const serverOrders = await response.json();
       if (Array.isArray(serverOrders)) {
         orders = serverOrders;
+        orderLoadError = "";
         render();
       }
-    } catch {
+    } catch (error) {
       orders = [];
+      orderLoadError = error.message || "Could not load Supabase orders.";
       render();
     }
   }
@@ -584,6 +587,7 @@
     const a = getAnalytics();
     document.getElementById("view").innerHTML = `
       <div class="dashboard-studio">
+        ${orderLoadError ? `<section class="card error-banner"><strong>Supabase orders are not loading.</strong><span>${escapeHtml(orderLoadError)}</span><span>Check Vercel environment variables and make sure public.dashboard_orders exists in that Supabase project.</span></section>` : ""}
         <section class="welcome-card">
           <div>
             <div class="welcome-kicker">Deeda Resells</div>

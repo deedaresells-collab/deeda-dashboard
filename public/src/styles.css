@@ -486,6 +486,22 @@ h1 {
   pointer-events: none;
 }
 
+.error-banner {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(23, 24, 27, 0.96));
+}
+
+.error-banner strong {
+  color: #fecaca;
+}
+
+.error-banner span {
+  color: var(--muted);
+}
+
 .metric-label,
 .section-label {
   color: var(--muted);
