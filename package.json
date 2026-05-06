@@ -1,0 +1,22 @@
+{
+  "name": "deeda-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first Deeda Resells dashboard with grouped orders, analytics, alerts, and category intelligence.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "orders:complete-old": "node scripts/complete-old-orders.js",
+    "telegram:preview": "node scripts/telegram-preview.js",
+    "telegram:daily": "node scripts/telegram-daily.js",
+    "telegram:commands": "node scripts/telegram-set-commands.js"
+  },
+  "keywords": [
+    "deeda",
+    "reselling",
+    "dashboard",
+    "orders"
+  ],
+  "author": "Deeda Resells",
+  "license": "UNLICENSED"
+}
