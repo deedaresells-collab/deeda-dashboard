@@ -2,12 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const root = __dirname;
+const root = path.join(__dirname, "public");
 const port = process.env.PORT || 4173;
-const dataDir = path.join(root, "data");
+const dataDir = path.join(__dirname, "data");
 const ordersFile = path.join(dataDir, "orders.json");
 const productsFile = path.join(dataDir, "products.json");
-const telegramAgent = require("./src/telegram-agent");
+const telegramAgent = require("./public/src/telegram-agent");
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
