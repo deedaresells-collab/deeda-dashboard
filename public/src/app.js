@@ -82,7 +82,16 @@
   async function hydrateOrdersFromServer() {
     try {
       let response = await fetch("/api/orders", { cache: "no-store" });
-      if (!response.ok) throw new Error("Orders API failed");
+      if (!response.ok) {
+        let detail = "";
+        try {
+          const errorBody = await response.json();
+          detail = errorBody.error || JSON.stringify(errorBody);
+        } catch {
+          detail = await response.text();
+        }
+        throw new Error(detail || `Orders API failed with ${response.status}`);
+      }
       const serverOrders = await response.json();
       if (Array.isArray(serverOrders)) {
         orders = serverOrders;
