@@ -15,6 +15,7 @@ fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
       { command: "tracking", description: "Orders missing tracking" },
       { command: "late", description: "Orders older than 3 days" },
       { command: "today", description: "Today's revenue, profit, orders" },
+      { command: "deals", description: "WV penny & clearance deals" },
       { command: "help", description: "List commands" }
     ]
   })

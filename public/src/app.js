@@ -24,6 +24,9 @@
   let customEnd = "";
   let storeCategory = "All";
   let orderLoadError = "";
+  let deals = [];
+  let dealsLoadError = "";
+  let dealsFilter = "all";
 
   const app = document.getElementById("app");
 
@@ -529,11 +532,12 @@
 
   function sidebarMarkup(className) {
     const nav = className === "mobile-nav"
-      ? ["Dashboard", "Orders", "Products", "Analytics", "Alerts"]
-      : ["Dashboard", "Orders", "Products", "Customers", "Analytics", "Alerts", "Settings"];
+      ? ["Dashboard", "Orders", "Deals", "Products", "Analytics", "Alerts"]
+      : ["Dashboard", "Orders", "Deals", "Products", "Customers", "Analytics", "Alerts", "Settings"];
     const icons = {
       Dashboard: icon("dashboard"),
       Orders: icon("orders"),
+      Deals: icon("deals"),
       Products: icon("products"),
       Customers: icon("customers"),
       Analytics: icon("analytics"),
@@ -564,6 +568,7 @@
       customers: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
       analytics: `<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/>`,
       alerts: `<path d="M10.3 21h3.4"/><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>`,
+      deals: `<path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><path d="M4 8h16"/><path d="M12 2v6"/><path d="M9 14h6"/>`,
       settings: `<path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.6 19a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 5 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06A2 2 0 1 1 7.43 3.8l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15.4 5a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.36.5.67.86.88.34.2.72.3 1.1.3H21a2 2 0 1 1 0 4h-.1A1.7 1.7 0 0 0 19.4 15Z"/>`
     };
     return `<svg ${attrs}>${paths[name]}</svg>`;
@@ -584,6 +589,7 @@
 
   function renderView() {
     if (activeView === "Orders") return renderOrders();
+    if (activeView === "Deals") return renderDealsPage();
     if (activeView === "Analytics") return renderAnalytics();
     if (activeView === "Alerts") return renderAlertsPage();
     if (activeView === "Products") return renderProductsPage();
@@ -944,6 +950,130 @@
 
   function renderAlertsPage() {
     document.getElementById("view").innerHTML = `<div class="page-title"><div><h1>Alerts</h1><p class="muted">Phase 1 in-dashboard agent reminders.</p></div></div>${alertsMarkup("Agent Reminders", buildAlerts())}`;
+  }
+
+  function filteredDeals() {
+    if (dealsFilter === "penny") return deals.filter((d) => d.alertType === "penny");
+    if (dealsFilter === "clearance") return deals.filter((d) => String(d.alertType || "").startsWith("clearance"));
+    if (dealsFilter === "homedepot") return deals.filter((d) => d.retailer === "homedepot");
+    if (dealsFilter === "lowes") return deals.filter((d) => d.retailer === "lowes");
+    return deals;
+  }
+
+  function dealBadge(alertType) {
+    if (alertType === "penny") return `<span class="status-pill danger">PENNY</span>`;
+    if (alertType === "clearance_90") return `<span class="status-pill danger">90%+ OFF</span>`;
+    if (alertType === "clearance_70") return `<span class="status-pill warning">70%+ OFF</span>`;
+    if (alertType === "clearance_50") return `<span class="status-pill success">50%+ OFF</span>`;
+    return `<span class="status-pill">DEAL</span>`;
+  }
+
+  function retailerName(retailer) {
+    return retailer === "lowes" ? "Lowe's" : "Home Depot";
+  }
+
+  function dealCard(deal) {
+    const was = deal.wasPrice ? `<span class="deal-was">${money(deal.wasPrice)}</span>` : "";
+    const stock = deal.stockQty != null ? `<span class="muted">Stock: ${deal.stockQty}</span>` : "";
+    const link = deal.productUrl ? `<a class="row-action" href="${escapeHtml(deal.productUrl)}" target="_blank" rel="noopener">View</a>` : "";
+    return `
+      <article class="deal-card">
+        <div class="deal-card-top">
+          <div>${dealBadge(deal.alertType)} <span class="muted">${escapeHtml(retailerName(deal.retailer))} · ${escapeHtml(deal.storeCity || deal.storeId || "")}</span></div>
+          <div class="deal-price">${money(deal.price)} ${was}</div>
+        </div>
+        <strong>${escapeHtml(deal.title)}</strong>
+        <div class="deal-meta">
+          ${deal.brand ? `<span>${escapeHtml(deal.brand)}</span>` : ""}
+          ${deal.pctOff ? `<span>${deal.pctOff}% off</span>` : ""}
+          ${stock}
+          <span class="muted">SKU ${escapeHtml(deal.sku || "")}</span>
+        </div>
+        <div class="row-actions">${link}</div>
+      </article>
+    `;
+  }
+
+  function renderDealsPage() {
+    const list = filteredDeals();
+    const pennyCount = deals.filter((d) => d.alertType === "penny").length;
+    const clearanceCount = deals.filter((d) => String(d.alertType || "").startsWith("clearance")).length;
+    document.getElementById("view").innerHTML = `
+      <div class="page-title">
+        <div>
+          <h1>WV Clearance Deals</h1>
+          <p class="muted">Penny items and clearance across all ${6 + 18} Home Depot & Lowe's stores in West Virginia.</p>
+        </div>
+        <div class="page-actions">
+          <button class="ghost-btn" id="refreshDealsBtn">Refresh</button>
+          <button class="primary-btn" id="runScanBtn">Run Scan</button>
+        </div>
+      </div>
+      ${dealsLoadError ? `<section class="card error-banner"><strong>Deals not loading.</strong><span>${escapeHtml(dealsLoadError)}</span></section>` : ""}
+      <div class="grid metric-grid">
+        ${metricCard("Penny Items", pennyCount, "$0.01–$0.03", true)}
+        ${metricCard("Clearance", clearanceCount, "50%+ off")}
+        ${metricCard("Total Deals", deals.length, "Active in database")}
+        ${metricCard("Showing", list.length, dealsFilter === "all" ? "All filters" : dealsFilter)}
+      </div>
+      <section class="card" style="margin-top:14px">
+        <div class="table-head">
+          <div><div class="section-label">West Virginia</div><h2>Penny & clearance hits</h2></div>
+          <div class="deal-filters">
+            ${["all", "penny", "clearance", "homedepot", "lowes"].map((f) => `<button class="ghost-btn deal-filter ${dealsFilter === f ? "active" : ""}" data-deal-filter="${f}">${f}</button>`).join("")}
+          </div>
+        </div>
+        <div class="deal-grid">
+          ${list.length ? list.map(dealCard).join("") : `<div class="empty-state">No deals yet. Run a scan to check all WV stores for penny and clearance items.</div>`}
+        </div>
+      </section>
+    `;
+    document.getElementById("refreshDealsBtn").addEventListener("click", () => hydrateDealsFromServer(true));
+    document.getElementById("runScanBtn").addEventListener("click", runClearanceScan);
+    document.querySelectorAll("[data-deal-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        dealsFilter = button.dataset.dealFilter;
+        render();
+      });
+    });
+  }
+
+  async function hydrateDealsFromServer(force) {
+    try {
+      const res = await fetch("/api/deals");
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load deals");
+      deals = data.deals || [];
+      dealsLoadError = "";
+      if (force && activeView === "Deals") render();
+    } catch (error) {
+      dealsLoadError = error.message;
+      if (force && activeView === "Deals") render();
+    }
+  }
+
+  async function runClearanceScan() {
+    const btn = document.getElementById("runScanBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Scanning WV stores...";
+    }
+    try {
+      const res = await fetch("/api/scrape-clearance", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || "Scan failed");
+      await hydrateDealsFromServer(false);
+      activeView = "Deals";
+      render();
+    } catch (error) {
+      dealsLoadError = error.message;
+      render();
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Run Scan";
+      }
+    }
   }
 
   function renderProductsPage() {
@@ -1734,4 +1864,5 @@
   render();
   hydrateOrdersFromServer();
   hydrateProductsFromServer();
+  hydrateDealsFromServer(false);
 })();

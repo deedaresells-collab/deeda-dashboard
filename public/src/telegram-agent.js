@@ -183,6 +183,7 @@ function helpMessage() {
     "/tracking - orders missing tracking",
     "/late - orders older than 3 days",
     "/today - today's revenue, profit, orders",
+    "/deals - WV penny & clearance deals",
     "/help - command list"
   ].join("\n");
 }
@@ -222,6 +223,10 @@ async function handleTelegramUpdate(update) {
     "/tracking": trackingMessage,
     "/late": lateMessage,
     "/today": todayMessage,
+    "/deals": async () => {
+      const { dealsSummaryMessage } = require("../../lib/clearance/alerts");
+      return dealsSummaryMessage();
+    },
     "/help": helpMessage
   };
   const reply = replies[command] ? await replies[command]() : helpMessage();

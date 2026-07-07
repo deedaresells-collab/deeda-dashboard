@@ -1,5 +1,10 @@
 {
   "outputDirectory": "public",
+  "functions": {
+    "api/scrape-clearance.js": {
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -22,6 +27,14 @@
     {
       "path": "/api/telegram-daily",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/scrape-clearance",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/scrape-clearance",
+      "schedule": "30 12 * * *"
     }
   ]
 }

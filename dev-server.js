@@ -29,6 +29,28 @@ function safePath(urlPath) {
   return filePath;
 }
 
+function buildReq(req) {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  return {
+    method: req.method,
+    query: Object.fromEntries(url.searchParams),
+    headers: req.headers
+  };
+}
+
+function buildRes(res) {
+  return {
+    status(code) {
+      this._code = code;
+      return this;
+    },
+    json(body) {
+      res.writeHead(this._code || 200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(body));
+    }
+  };
+}
+
 const server = http.createServer((req, res) => {
   if (req.url === "/api/products" && req.method === "GET") {
     fs.readFile(productsFile, "utf8", (error, data) => {
@@ -120,6 +142,22 @@ const server = http.createServer((req, res) => {
         res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({ ok: false, error: error.message }));
       });
+    return;
+  }
+
+  if (req.url === "/api/deals" && req.method === "GET") {
+    require("./api/deals")(buildReq(req), buildRes(res)).catch((error) => {
+      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: error.message }));
+    });
+    return;
+  }
+
+  if (req.url.startsWith("/api/scrape-clearance") && (req.method === "GET" || req.method === "POST")) {
+    require("./api/scrape-clearance")(buildReq(req), buildRes(res)).catch((error) => {
+      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: error.message }));
+    });
     return;
   }
 
