@@ -5,23 +5,44 @@ create table if not exists clearance_deals (
   retailer text not null check (retailer in ('homedepot', 'lowes')),
   store_id text not null,
   store_city text,
+  store_zip text,
   sku text not null,
   title text not null,
   brand text,
   price numeric(10, 4),
   was_price numeric(10, 4),
+  previous_price numeric(10, 4),
   pct_off integer default 0,
   stock_qty integer,
   alert_type text not null,
+  kind text not null default 'in_store' check (kind in ('in_store', 'penny', 'online', 'curated')),
+  verified boolean not null default true,
   image_url text,
   product_url text,
   category text,
+  aisle text,
+  bay text,
+  transition_reason text,
   first_seen_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
   alert_sent_at timestamptz,
   status text not null default 'active' check (status in ('active', 'expired', 'purchased')),
   unique (retailer, store_id, sku)
 );
+
+create table if not exists clearance_price_history (
+  id uuid primary key default gen_random_uuid(),
+  retailer text not null,
+  store_id text not null,
+  sku text not null,
+  title text,
+  price numeric(10, 4),
+  was_price numeric(10, 4),
+  stock_qty integer,
+  scanned_at timestamptz not null default now()
+);
+
+create index if not exists clearance_price_history_lookup_idx on clearance_price_history (retailer, store_id, sku, scanned_at desc);
 
 create index if not exists clearance_deals_alert_type_idx on clearance_deals (alert_type);
 create index if not exists clearance_deals_last_seen_idx on clearance_deals (last_seen_at desc);
@@ -41,6 +62,7 @@ create table if not exists clearance_scan_runs (
 
 alter table clearance_deals enable row level security;
 alter table clearance_scan_runs enable row level security;
+alter table clearance_price_history enable row level security;
 
 drop policy if exists clearance_deals_read_anon on clearance_deals;
 create policy clearance_deals_read_anon
@@ -49,3 +71,7 @@ create policy clearance_deals_read_anon
 drop policy if exists clearance_scan_runs_read_anon on clearance_scan_runs;
 create policy clearance_scan_runs_read_anon
   on clearance_scan_runs for select to anon using (true);
+
+drop policy if exists clearance_price_history_read_anon on clearance_price_history;
+create policy clearance_price_history_read_anon
+  on clearance_price_history for select to anon using (true);

@@ -26,7 +26,12 @@
   let orderLoadError = "";
   let deals = [];
   let dealsLoadError = "";
-  let dealsFilter = "all";
+  let dealsKind = "in_store";
+  let dealsRetailer = "";
+  let dealsSort = "recommended";
+  let dealsMinDiscount = 50;
+  let dealsSearch = "";
+  let dealsZip = localStorage.getItem("deeda.deals.zip") || "25309";
 
   const app = document.getElementById("app");
 
@@ -952,19 +957,12 @@
     document.getElementById("view").innerHTML = `<div class="page-title"><div><h1>Alerts</h1><p class="muted">Phase 1 in-dashboard agent reminders.</p></div></div>${alertsMarkup("Agent Reminders", buildAlerts())}`;
   }
 
-  function filteredDeals() {
-    if (dealsFilter === "penny") return deals.filter((d) => d.alertType === "penny");
-    if (dealsFilter === "clearance") return deals.filter((d) => String(d.alertType || "").startsWith("clearance"));
-    if (dealsFilter === "homedepot") return deals.filter((d) => d.retailer === "homedepot");
-    if (dealsFilter === "lowes") return deals.filter((d) => d.retailer === "lowes");
-    return deals;
-  }
-
-  function dealBadge(alertType) {
-    if (alertType === "penny") return `<span class="status-pill danger">PENNY</span>`;
-    if (alertType === "clearance_90") return `<span class="status-pill danger">90%+ OFF</span>`;
-    if (alertType === "clearance_70") return `<span class="status-pill warning">70%+ OFF</span>`;
-    if (alertType === "clearance_50") return `<span class="status-pill success">50%+ OFF</span>`;
+  function dealBadge(deal) {
+    if (deal.kind === "penny" || deal.alertType === "penny") return `<span class="status-pill danger">PENNY</span>`;
+    if (deal.verified) return `<span class="status-pill success">VERIFIED</span>`;
+    if (deal.alertType === "clearance_90") return `<span class="status-pill danger">90%+ OFF</span>`;
+    if (deal.alertType === "clearance_70") return `<span class="status-pill warning">70%+ OFF</span>`;
+    if (deal.alertType === "clearance_50") return `<span class="status-pill success">50%+ OFF</span>`;
     return `<span class="status-pill">DEAL</span>`;
   }
 
@@ -974,19 +972,23 @@
 
   function dealCard(deal) {
     const was = deal.wasPrice ? `<span class="deal-was">${money(deal.wasPrice)}</span>` : "";
+    const prev = deal.previousPrice ? `<span class="muted">was ${money(deal.previousPrice)}</span>` : "";
     const stock = deal.stockQty != null ? `<span class="muted">Stock: ${deal.stockQty}</span>` : "";
-    const link = deal.productUrl ? `<a class="row-action" href="${escapeHtml(deal.productUrl)}" target="_blank" rel="noopener">View</a>` : "";
+    const location = deal.aisle ? `<span>Aisle ${escapeHtml(deal.aisle)}${deal.bay ? ` · Bay ${escapeHtml(deal.bay)}` : ""}</span>` : "";
+    const link = deal.productUrl ? `<a class="row-action" href="${escapeHtml(deal.productUrl)}" target="_blank" rel="noopener">View at store</a>` : "";
     return `
       <article class="deal-card">
         <div class="deal-card-top">
-          <div>${dealBadge(deal.alertType)} <span class="muted">${escapeHtml(retailerName(deal.retailer))} · ${escapeHtml(deal.storeCity || deal.storeId || "")}</span></div>
+          <div>${dealBadge(deal)} <span class="muted">${escapeHtml(retailerName(deal.retailer))} · ${escapeHtml(deal.storeCity || deal.storeId || "")}</span></div>
           <div class="deal-price">${money(deal.price)} ${was}</div>
         </div>
         <strong>${escapeHtml(deal.title)}</strong>
         <div class="deal-meta">
           ${deal.brand ? `<span>${escapeHtml(deal.brand)}</span>` : ""}
           ${deal.pctOff ? `<span>${deal.pctOff}% off</span>` : ""}
+          ${prev}
           ${stock}
+          ${location}
           <span class="muted">SKU ${escapeHtml(deal.sku || "")}</span>
         </div>
         <div class="row-actions">${link}</div>
@@ -995,14 +997,14 @@
   }
 
   function renderDealsPage() {
-    const list = filteredDeals();
-    const pennyCount = deals.filter((d) => d.alertType === "penny").length;
-    const clearanceCount = deals.filter((d) => String(d.alertType || "").startsWith("clearance")).length;
+    const pennyCount = deals.filter((d) => d.kind === "penny" || d.alertType === "penny").length;
+    const inStoreCount = deals.filter((d) => d.kind === "in_store" || !d.kind).length;
+    const verifiedCount = deals.filter((d) => d.verified !== false).length;
     document.getElementById("view").innerHTML = `
       <div class="page-title">
         <div>
-          <h1>WV Clearance Deals</h1>
-          <p class="muted">Penny items and clearance across all ${6 + 18} Home Depot & Lowe's stores in West Virginia.</p>
+          <h1>Verified WV Deals</h1>
+          <p class="muted">In-store penny & clearance — verified stock, price history, all ${6 + 18} HD & Lowe's in West Virginia.</p>
         </div>
         <div class="page-actions">
           <button class="ghost-btn" id="refreshDealsBtn">Refresh</button>
@@ -1011,39 +1013,95 @@
       </div>
       ${dealsLoadError ? `<section class="card error-banner"><strong>Deals not loading.</strong><span>${escapeHtml(dealsLoadError)}</span></section>` : ""}
       <div class="grid metric-grid">
-        ${metricCard("Penny Items", pennyCount, "$0.01–$0.03", true)}
-        ${metricCard("Clearance", clearanceCount, "50%+ off")}
-        ${metricCard("Total Deals", deals.length, "Active in database")}
-        ${metricCard("Showing", list.length, dealsFilter === "all" ? "All filters" : dealsFilter)}
+        ${metricCard("Penny Items", pennyCount, "$0.01 verified", true)}
+        ${metricCard("In-Store", inStoreCount, "Hidden markdowns")}
+        ${metricCard("Verified", verifiedCount, "Stock confirmed")}
+        ${metricCard("ZIP ${dealsZip}", deals.length, "Active near you")}
       </div>
       <section class="card" style="margin-top:14px">
         <div class="table-head">
-          <div><div class="section-label">West Virginia</div><h2>Penny & clearance hits</h2></div>
-          <div class="deal-filters">
-            ${["all", "penny", "clearance", "homedepot", "lowes"].map((f) => `<button class="ghost-btn deal-filter ${dealsFilter === f ? "active" : ""}" data-deal-filter="${f}">${f}</button>`).join("")}
-          </div>
+          <div><div class="section-label">Explorer</div><h2>Verified in-store deals</h2></div>
+        </div>
+        <div class="deal-toolbar">
+          <input class="deal-input" id="dealsZipInput" placeholder="ZIP code" value="${escapeHtml(dealsZip)}" maxlength="5" />
+          <input class="deal-input deal-search" id="dealsSearchInput" placeholder="Search products..." value="${escapeHtml(dealsSearch)}" />
+          <select class="deal-input" id="dealsSortSelect">
+            ${[
+              ["recommended", "Recommended"],
+              ["discount_percent", "Biggest % off"],
+              ["discount_amount", "Biggest $ off"],
+              ["newest", "Newest"],
+              ["stock_high", "Most in stock"],
+              ["stock_low", "Low stock"]
+            ].map(([v, l]) => `<option value="${v}" ${dealsSort === v ? "selected" : ""}>${l}</option>`).join("")}
+          </select>
+          <select class="deal-input" id="dealsDiscountSelect">
+            ${[[0, "Any discount"], [25, "25%+ off"], [50, "50%+ off"], [75, "75%+ off"]].map(([v, l]) => `<option value="${v}" ${dealsMinDiscount === v ? "selected" : ""}>${l}</option>`).join("")}
+          </select>
+        </div>
+        <div class="deal-filters" style="padding:0 14px 14px">
+          ${[
+            ["in_store", "In-Store"],
+            ["penny", "Penny"],
+            ["all", "All"],
+            ["homedepot", "Home Depot"],
+            ["lowes", "Lowe's"]
+          ].map(([f, label]) => `<button class="ghost-btn deal-filter ${dealsKind === f || (f === "homedepot" && dealsRetailer === "homedepot") || (f === "lowes" && dealsRetailer === "lowes") ? "active" : ""}" data-deal-kind="${f}">${label}</button>`).join("")}
         </div>
         <div class="deal-grid">
-          ${list.length ? list.map(dealCard).join("") : `<div class="empty-state">No deals yet. Run a scan to check all WV stores for penny and clearance items.</div>`}
+          ${deals.length ? deals.map(dealCard).join("") : `<div class="empty-state">No verified deals yet. Set your ZIP and run a scan — we verify stock and track price drops like Hidden Clearances.</div>`}
         </div>
       </section>
     `;
     document.getElementById("refreshDealsBtn").addEventListener("click", () => hydrateDealsFromServer(true));
     document.getElementById("runScanBtn").addEventListener("click", runClearanceScan);
-    document.querySelectorAll("[data-deal-filter]").forEach((button) => {
+    document.getElementById("dealsZipInput").addEventListener("change", (e) => {
+      dealsZip = e.target.value.trim().slice(0, 5);
+      localStorage.setItem("deeda.deals.zip", dealsZip);
+      hydrateDealsFromServer(true);
+    });
+    document.getElementById("dealsSearchInput").addEventListener("input", (e) => {
+      dealsSearch = e.target.value;
+      clearTimeout(window.__deedaSearchTimer);
+      window.__deedaSearchTimer = setTimeout(() => hydrateDealsFromServer(true), 400);
+    });
+    document.getElementById("dealsSortSelect").addEventListener("change", (e) => {
+      dealsSort = e.target.value;
+      hydrateDealsFromServer(true);
+    });
+    document.getElementById("dealsDiscountSelect").addEventListener("change", (e) => {
+      dealsMinDiscount = Number(e.target.value);
+      hydrateDealsFromServer(true);
+    });
+    document.querySelectorAll("[data-deal-kind]").forEach((button) => {
       button.addEventListener("click", () => {
-        dealsFilter = button.dataset.dealFilter;
-        render();
+        const k = button.dataset.dealKind;
+        if (k === "homedepot" || k === "lowes") {
+          dealsRetailer = k;
+          dealsKind = "in_store";
+        } else {
+          dealsKind = k;
+          dealsRetailer = "";
+        }
+        hydrateDealsFromServer(true);
       });
     });
   }
 
   async function hydrateDealsFromServer(force) {
     try {
-      const res = await fetch("/api/deals");
+      const params = new URLSearchParams({
+        kind: dealsKind,
+        sort: dealsSort,
+        minDiscount: String(dealsMinDiscount),
+        limit: "48"
+      });
+      if (dealsRetailer) params.set("retailer", dealsRetailer);
+      if (dealsSearch.trim()) params.set("search", dealsSearch.trim());
+      const res = await fetch(`/api/deals?${params}`);
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load deals");
-      deals = data.deals || [];
+      deals = data.data || data.deals || [];
       dealsLoadError = "";
       if (force && activeView === "Deals") render();
     } catch (error) {
@@ -1056,10 +1114,11 @@
     const btn = document.getElementById("runScanBtn");
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Scanning WV stores...";
+      btn.textContent = "Scanning & verifying...";
     }
     try {
-      const res = await fetch("/api/scrape-clearance", { method: "POST" });
+      const params = new URLSearchParams({ zip: dealsZip, minDiscount: String(dealsMinDiscount) });
+      const res = await fetch(`/api/scrape-clearance?${params}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok || data.ok === false) throw new Error(data.error || "Scan failed");
       await hydrateDealsFromServer(false);

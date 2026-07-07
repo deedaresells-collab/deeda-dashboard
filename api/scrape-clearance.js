@@ -18,7 +18,9 @@ module.exports = async function handler(req, res) {
 
   try {
     const sendAlerts = req.query?.alerts !== "false";
-    const result = await runClearanceScan({ sendAlerts });
+    const zip = req.query?.zip || process.env.DEALS_ZIP || "25309";
+    const minDiscount = Number(req.query?.minDiscount || 50);
+    const result = await runClearanceScan({ sendAlerts, zip, minDiscount });
     res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
