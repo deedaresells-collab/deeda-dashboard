@@ -1,35 +1,4 @@
-create table if not exists dashboard_orders (
-  id bigint generated always as identity primary key,
-  position integer not null,
-  payload jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists dashboard_products (
-  id bigint generated always as identity primary key,
-  position integer not null,
-  payload jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-alter table dashboard_orders enable row level security;
-alter table dashboard_products enable row level security;
-
-drop policy if exists dashboard_orders_read_anon on dashboard_orders;
-create policy dashboard_orders_read_anon
-  on dashboard_orders
-  for select
-  to anon
-  using (true);
-
-drop policy if exists dashboard_products_read_anon on dashboard_products;
-create policy dashboard_products_read_anon
-  on dashboard_products
-  for select
-  to anon
-  using (true);
-
--- Writes happen through Vercel server functions using service role key.
+-- Clearance / penny deal tracking for Home Depot & Lowe's (West Virginia)
 
 create table if not exists clearance_deals (
   id uuid primary key default gen_random_uuid(),
@@ -46,7 +15,7 @@ create table if not exists clearance_deals (
   pct_off integer default 0,
   stock_qty integer,
   alert_type text not null,
-  kind text not null default 'in_store',
+  kind text not null default 'in_store' check (kind in ('in_store', 'penny', 'online', 'curated')),
   verified boolean not null default true,
   image_url text,
   product_url text,
@@ -61,10 +30,6 @@ create table if not exists clearance_deals (
   unique (retailer, store_id, sku)
 );
 
-create index if not exists clearance_deals_alert_type_idx on clearance_deals (alert_type);
-create index if not exists clearance_deals_last_seen_idx on clearance_deals (last_seen_at desc);
-create index if not exists clearance_deals_kind_idx on clearance_deals (kind);
-
 create table if not exists clearance_price_history (
   id uuid primary key default gen_random_uuid(),
   retailer text not null,
@@ -78,6 +43,10 @@ create table if not exists clearance_price_history (
 );
 
 create index if not exists clearance_price_history_lookup_idx on clearance_price_history (retailer, store_id, sku, scanned_at desc);
+
+create index if not exists clearance_deals_alert_type_idx on clearance_deals (alert_type);
+create index if not exists clearance_deals_last_seen_idx on clearance_deals (last_seen_at desc);
+create index if not exists clearance_deals_price_idx on clearance_deals (price);
 
 create table if not exists clearance_scan_runs (
   id uuid primary key default gen_random_uuid(),
@@ -96,10 +65,13 @@ alter table clearance_scan_runs enable row level security;
 alter table clearance_price_history enable row level security;
 
 drop policy if exists clearance_deals_read_anon on clearance_deals;
-create policy clearance_deals_read_anon on clearance_deals for select to anon using (true);
+create policy clearance_deals_read_anon
+  on clearance_deals for select to anon using (true);
 
 drop policy if exists clearance_scan_runs_read_anon on clearance_scan_runs;
-create policy clearance_scan_runs_read_anon on clearance_scan_runs for select to anon using (true);
+create policy clearance_scan_runs_read_anon
+  on clearance_scan_runs for select to anon using (true);
 
 drop policy if exists clearance_price_history_read_anon on clearance_price_history;
-create policy clearance_price_history_read_anon on clearance_price_history for select to anon using (true);
+create policy clearance_price_history_read_anon
+  on clearance_price_history for select to anon using (true);

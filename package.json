@@ -4,7 +4,8 @@
   "scripts": {
     "build": "echo Build complete",
     "start": "node dev-server.js",
-    "dev": "node dev-server.js"
+    "dev": "node dev-server.js",
+    "scan:clearance": "node scripts/run-clearance-scan.js"
   },
   "dependencies": {}
 }
