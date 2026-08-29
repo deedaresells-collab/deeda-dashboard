@@ -2,31 +2,16 @@
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-
 import pandas as pd
-import pytest
 
 from pmresearch.backtests.engine import BacktestEngine
 from pmresearch.backtests.metrics import compute_metrics
-from pmresearch.collectors.demo_data import generate_demo_dataset
 from pmresearch.config import Config, load_config
 from pmresearch.data.loader import chronological_split, load_merged_snapshots
-from pmresearch.data.storage import Database
 from pmresearch.execution.costs import simulate_market_order
 from pmresearch.features.market_features import add_fair_value_features
 from pmresearch.models.fair_value import compute_fair_probabilities, fair_probability_row
 from pmresearch.reports.calibration import calibration_table, edge_bucket_analysis
-
-
-@pytest.fixture
-def temp_db():
-    with tempfile.TemporaryDirectory() as tmp:
-        db = Database(Path(tmp) / "test.duckdb")
-        generate_demo_dataset(db, n_days=3, seed=123)
-        yield db
-        db.close()
 
 
 def test_config_loads():

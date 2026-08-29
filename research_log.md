@@ -16,3 +16,10 @@ Platform baseline implementation. All experiments logged below.
 - **Strategy C (test):** 5889 trades, +$3543 net
 - **Verdict:** Pipeline works end-to-end; synthetic data cannot support real edge claims
 - **Next:** Import real prediction-market order book data; fix Strategy B overtrading
+
+## Regime Engine — 2026-08-29
+
+- **Added:** Market regime classifier (MEAN_REVERTING / MOMENTUM_TRENDING / UNCERTAIN)
+- **Strategies:** mean_reversion_only, momentum_only, fair_value_only, order_flow_only, regime_switching
+- **Risk:** Adaptive position sizing, correlation engine, exit logic, portfolio circuit breaker
+- **Comparison:** All components backtested separately on untouched OOS test split

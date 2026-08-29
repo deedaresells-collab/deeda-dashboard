@@ -66,6 +66,17 @@ position_sizes_usd:
 monte_carlo:
   simulations: 10000
 
+regime:
+  min_edge: 0.02
+  z_threshold: 1.5
+  persistence_threshold: 0.5
+  daily_loss_limit_pct: 0.05
+  max_drawdown_pct: 0.15
+  correlated_exposure_limit_pct: 0.30
+  per_asset_limit_pct: 0.25
+  uncertainty_buffer: 0.01
+  ma_window: 20
+
 calibration_buckets:
   - [0.0, 0.10]
   - [0.10, 0.20]

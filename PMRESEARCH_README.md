@@ -40,7 +40,20 @@ pytest tests/ -v
 Prediction market snapshots: market ID, YES/NO bid/ask, depth, timestamps, settlement.
 Crypto snapshots: spot, bid/ask, returns, vol, order book imbalance.
 
-## Outputs
+### Regime Engine
+
+```bash
+python3 run_backtest.py backtest-regime
+```
+
+Compares five strategy components on out-of-sample data:
+- `fair_value_only` — baseline fair value
+- `mean_reversion_only` — fade probability overshoots in MEAN_REVERTING regime
+- `momentum_only` — trade breakouts in MOMENTUM_TRENDING regime
+- `order_flow_only` — OB imbalance signals
+- `regime_switching` — routes by regime
+
+Output: `regime_results_summary.md`
 
 - `results_summary.md` — final research summary
 - `research_log.md` — experiment log

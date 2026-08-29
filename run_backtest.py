@@ -26,6 +26,52 @@ def cmd_generate_demo(args: argparse.Namespace) -> None:
     db.close()
 
 
+def cmd_backtest_regime(args: argparse.Namespace) -> None:
+    from pmresearch.backtests.regime_engine import RegimeBacktestRunner
+    from pmresearch.data.loader import chronological_split
+    from pmresearch.reports.regime_summary import generate_regime_report
+
+    config = load_config()
+    db = Database(config.database_path)
+
+    if db.count_rows("prediction_snapshots") == 0:
+        print("No data found. Generating demo dataset...")
+        generate_demo_dataset(db, n_days=args.days)
+        data_type = "SYNTHETIC_DEMO"
+    else:
+        data_type = args.data_type
+
+    df = load_merged_snapshots(db)
+    if df.empty:
+        print("ERROR: No merged snapshots available.")
+        sys.exit(1)
+
+    print(f"Loaded {len(df)} snapshots for regime backtest")
+
+    runner = RegimeBacktestRunner(config)
+    prepared = runner.prepare_data(df)
+    _, _, test = chronological_split(prepared, train_pct=config.train_pct, val_pct=config.validation_pct)
+    print(f"Test set: {len(test)} snapshots (untouched OOS)")
+
+    results = runner.compare_components(test, split_name="test")
+    results["data_type"] = data_type
+
+    out_dir = ROOT / "reports" / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "regime_comparison.json"
+    serializable = {k: v for k, v in results.items() if k != "trades"}
+    out_path.write_text(json.dumps(serializable, indent=2, default=str), encoding="utf-8")
+
+    report = generate_regime_report(results)
+    print(f"\nRegime comparison saved to {out_path}")
+    print(f"Report: {ROOT / 'regime_results_summary.md'}")
+    print("\n--- OOS Component Comparison ---")
+    for name, m in results["components"].items():
+        print(f"  {name:25s}  trades={m.get('num_trades', 0):5.0f}  net=${m.get('net_profit', 0):>10,.2f}  sharpe={m.get('sharpe_ratio', 0):.3f}")
+
+    db.close()
+
+
 def cmd_backtest(args: argparse.Namespace) -> None:
     config = load_config()
     db = Database(config.database_path)
@@ -112,6 +158,11 @@ def main() -> None:
     imp.add_argument("--assets", nargs="+", default=["BTC", "ETH"])
     imp.add_argument("--limit", type=int, default=500)
     imp.set_defaults(func=cmd_import_crypto)
+
+    reg = sub.add_parser("backtest-regime", help="Run regime engine component comparison on OOS data")
+    reg.add_argument("--data-type", default="SYNTHETIC_DEMO")
+    reg.add_argument("--days", type=int, default=14, help="Demo data days if DB empty")
+    reg.set_defaults(func=cmd_backtest_regime)
 
     args = parser.parse_args()
     if not args.command:
