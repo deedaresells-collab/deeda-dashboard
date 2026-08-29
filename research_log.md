@@ -17,7 +17,15 @@ Platform baseline implementation. All experiments logged below.
 - **Verdict:** Pipeline works end-to-end; synthetic data cannot support real edge claims
 - **Next:** Import real prediction-market order book data; fix Strategy B overtrading
 
-## Regime Engine — 2026-08-29
+## Strategy Framework Refactor — 2026-08-29
+
+- **Added:** `pmresearch/regimes/` — configurable rule-based classifier
+- **Added:** `pmresearch/risk/` — position sizing (FIXED_SIZE/FIXED_FRACTION/EDGE_WEIGHTED), exposure, circuit breakers, exits
+- **Split strategies:** fair_value, mean_reversion, momentum, order_flow, regime_switch
+- **Added:** `StrategyBacktestEngine` — common execution for all 5 strategies
+- **Added:** `strategy_comparison.json` + `strategy_comparison.md` reports
+- **Tests:** 27 passing (regime, risk, strategy routing, no look-ahead)
+- **OOS synthetic results:** All strategies unprofitable or zero trades — pipeline validated, no edge claimed
 
 - **Added:** Market regime classifier (MEAN_REVERTING / MOMENTUM_TRENDING / UNCERTAIN)
 - **Strategies:** mean_reversion_only, momentum_only, fair_value_only, order_flow_only, regime_switching

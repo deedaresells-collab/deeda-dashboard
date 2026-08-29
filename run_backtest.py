@@ -26,6 +26,62 @@ def cmd_generate_demo(args: argparse.Namespace) -> None:
     db.close()
 
 
+def cmd_compare_strategies(args: argparse.Namespace) -> None:
+    from pmresearch.backtests.strategy_engine import StrategyBacktestEngine
+    from pmresearch.reports.strategy_comparison import build_comparison_report, save_comparison_report
+
+    config = load_config()
+    db = Database(config.database_path)
+
+    if db.count_rows("prediction_snapshots") == 0:
+        print("No data found. Generating demo dataset...")
+        generate_demo_dataset(db, n_days=args.days, seed=args.seed)
+        data_type = "SYNTHETIC_DEMO"
+    else:
+        data_type = args.data_type
+
+    df = load_merged_snapshots(db)
+    if df.empty:
+        print("ERROR: No merged snapshots available.")
+        sys.exit(1)
+
+    print(f"Loaded {len(df)} snapshots")
+    engine = StrategyBacktestEngine(config)
+    results = engine.run_oos_comparison(df)
+    results["data_type"] = data_type
+
+    # Regime distribution on test set
+    prepared = engine.prepare_data(df)
+    from pmresearch.data.loader import chronological_split
+    _, _, test = chronological_split(prepared, train_pct=config.train_pct, val_pct=config.validation_pct)
+    if "regime" in test.columns:
+        dist = test["regime"].value_counts(normalize=True).to_dict()
+        results["regime_distribution"] = {str(k): float(v) for k, v in dist.items()}
+
+    report = build_comparison_report(results, data_type=data_type)
+    json_path, md_path = save_comparison_report(report)
+
+    print(f"\nComparison saved to {json_path}")
+    print(f"Report: {md_path}")
+    print("\n" + "=" * 60)
+    print("TERMINAL SUMMARY")
+    print("=" * 60)
+    print(f"DATASET USED:        {data_type} (synthetic — NOT evidence of edge)")
+    print(f"TEST OBSERVATIONS:   {results.get('test_size', 0)}")
+    print(f"STRATEGIES TESTED:   {', '.join(results['strategies'].keys())}")
+    print("\nTRADES BY STRATEGY / NET RESULTS:")
+    for name, m in results["strategies"].items():
+        print(f"  {name:18s}  trades={m.get('num_trades', 0):5.0f}  net=${m.get('net_profit', 0):>10,.2f}  max_dd={m.get('max_drawdown', 0):.2%}  sharpe={m.get('sharpe_ratio', 0):.3f}")
+    print("\nKNOWN LIMITATIONS:")
+    print("  - Synthetic demo data only; no real prediction-market order books")
+    print("  - Results validate pipeline, NOT trading edge")
+    print("  - Parameter selection must use train/val only, never test set")
+    print("\nNEXT REQUIRED DATA:")
+    print("  - Historical prediction-market order book snapshots")
+    print("  - Real settlement outcomes with synchronized crypto feeds")
+    db.close()
+
+
 def cmd_backtest_regime(args: argparse.Namespace) -> None:
     from pmresearch.backtests.regime_engine import RegimeBacktestRunner
     from pmresearch.data.loader import chronological_split
@@ -163,6 +219,12 @@ def main() -> None:
     reg.add_argument("--data-type", default="SYNTHETIC_DEMO")
     reg.add_argument("--days", type=int, default=14, help="Demo data days if DB empty")
     reg.set_defaults(func=cmd_backtest_regime)
+
+    cmp = sub.add_parser("compare-strategies", help="Run all 5 strategies through common engine on OOS data")
+    cmp.add_argument("--data-type", default="SYNTHETIC_DEMO")
+    cmp.add_argument("--days", type=int, default=14)
+    cmp.add_argument("--seed", type=int, default=42)
+    cmp.set_defaults(func=cmd_compare_strategies)
 
     args = parser.parse_args()
     if not args.command:

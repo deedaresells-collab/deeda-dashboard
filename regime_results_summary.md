@@ -1,17 +1,17 @@
 # Regime Engine Results
 
-Generated: 2026-08-29T01:05:33.663793+00:00
+Generated: 2026-08-29T01:08:12.229512+00:00
 Min edge threshold: 2.0%
 
 ## Component Comparison (Out-of-Sample)
 
 | Component | Trades | Net P&L | Win Rate | Sharpe | Max DD | PF | Realized Edge | CB Triggered |
 |-----------|--------|---------|----------|--------|--------|-----|---------------|--------------|
-| mean_reversion_only | 527 | $6,438.31 | 19.2% | 5.390 | -1.59% | 4.71 | 0.1450 | False |
+| mean_reversion_only | 526 | $6,230.22 | 18.8% | 5.300 | -1.58% | 4.60 | 0.1414 | False |
 | order_flow_only | 508 | $3,902.31 | 32.9% | 6.443 | -0.97% | 3.75 | 0.1978 | False |
-| regime_switching | 1089 | $3,874.71 | 45.5% | 1.838 | -3.76% | 1.51 | 0.0294 | False |
-| momentum_only | 37 | $320.01 | 48.6% | 1.653 | -2.73% | 1.28 | 0.0485 | False |
-| fair_value_only | 145 | $-495.18 | 76.6% | -1.218 | -7.72% | 0.78 | -0.0448 | True |
+| regime_switching | 1072 | $2,979.38 | 44.9% | 1.453 | -3.51% | 1.38 | 0.0231 | False |
+| fair_value_only | 149 | $-479.15 | 77.2% | -1.159 | -8.40% | 0.79 | -0.0391 | True |
+| momentum_only | 37 | $-829.19 | 32.4% | -4.752 | -8.50% | 0.50 | -0.1052 | True |
 
 ## Interpretation
 
@@ -29,11 +29,11 @@ Components are active only in their designated regimes:
 
 ### Best OOS Component (by net P&L)
 
-**mean_reversion_only** — $6,438.31 net, 527 trades, Sharpe 5.390
+**mean_reversion_only** — $6,230.22 net, 526 trades, Sharpe 5.300
 
 ## Evidence Assessment
 
-**order_flow_only** shows positive OOS P&L with 508 trades and Sharpe 6.443. Requires validation on real data before any capital allocation.
+**INCONCLUSIVE — synthetic demo data.** Components show varying OOS results but these cannot support claims of a real edge. Import real historical data before drawing conclusions.
 
 ## Risk Controls Applied
 

@@ -10,15 +10,14 @@ import pandas as pd
 
 from pmresearch.backtests.metrics import compute_metrics, metrics_by_group
 from pmresearch.config import Config
-from pmresearch.execution.circuit_breaker import CircuitBreakerConfig, CircuitBreakerState
-from pmresearch.execution.correlation import ExposureState, OpenPosition
 from pmresearch.execution.costs import simulate_market_order
-from pmresearch.execution.exit_logic import ExitReason, check_exit
-from pmresearch.execution.position_sizing import compute_position_size
 from pmresearch.features.market_features import add_fair_value_features
-from pmresearch.features.regime import classify_regimes, merge_regime_to_snapshots
-from pmresearch.models.fair_value import compute_fair_probabilities
-from pmresearch.models.regime_fair_value import regime_adjusted_probability
+from pmresearch.models.fair_value import compute_adjusted_probabilities
+from pmresearch.regimes.classifier import classify_regimes, merge_regime_to_snapshots
+from pmresearch.risk.circuit_breaker import CircuitBreakerConfig, CircuitBreakerState
+from pmresearch.risk.exposure import ExposureState, OpenPosition, RiskLimits
+from pmresearch.risk.exits import ExitReason, check_exit
+from pmresearch.risk.position_sizing import PositionSizingMethod, compute_position_size
 from pmresearch.strategies.regime_signals import (
     TradeSignal,
     fair_value_signals,
@@ -53,10 +52,14 @@ class RegimeBacktestRunner:
             daily_loss_limit_pct=config.raw.get("regime", {}).get("daily_loss_limit_pct", 0.05),
             max_portfolio_drawdown_pct=config.raw.get("regime", {}).get("max_drawdown_pct", 0.15),
         )
+        self.risk_limits = RiskLimits(
+            max_asset_exposure_pct=config.raw.get("regime", {}).get("per_asset_limit_pct", 0.25),
+            correlated_exposure_limit_pct=config.raw.get("regime", {}).get("correlated_exposure_limit_pct", 0.30),
+        )
 
     def prepare_data(self, df: pd.DataFrame, crypto_df: pd.DataFrame | None = None) -> pd.DataFrame:
         df = add_fair_value_features(df)
-        df = compute_fair_probabilities(df)
+        df = compute_adjusted_probabilities(df)
 
         if crypto_df is not None and not crypto_df.empty:
             regime_df = classify_regimes(crypto_df)
@@ -74,9 +77,7 @@ class RegimeBacktestRunner:
             regime_df = classify_regimes(df[avail].drop_duplicates(["asset", "timestamp"]))
 
         df = merge_regime_to_snapshots(df, regime_df)
-        df = regime_adjusted_probability(df)
 
-        # Add prob_change for momentum/mean-reversion
         df = df.sort_values(["market_id", "timestamp"])
         df["prob_change"] = df.groupby("market_id")["market_probability"].diff().fillna(0)
         return df
@@ -117,7 +118,7 @@ class RegimeBacktestRunner:
             key = (s.market_id, s.timestamp)
             signal_map.setdefault(key, []).append(s)
 
-        exposure = ExposureState()
+        exposure = ExposureState(limits=self.risk_limits)
         cb = CircuitBreakerState(self.cb_config, self.config.initial_capital)
         open_positions: dict[str, OpenPosition] = {}
         closed_trades: list[dict] = []
@@ -164,7 +165,7 @@ class RegimeBacktestRunner:
                         pnl = pos.size_usd * ((1 - settlement) - pos.entry_price) - pos.size_usd * self.config.exchange_fee_pct
                     closed_trades.append(self._trade_record(pos, pnl, reason, settlement, snap))
                     equity += pnl
-                    cb.record_pnl(pnl, trade_date)
+                    cb.record_trade(pnl, trade_date)
                     to_close.append(pid)
 
             for pid in to_close:
@@ -191,12 +192,14 @@ class RegimeBacktestRunner:
 
                 corr_exp = exposure.correlated_exposure(sig.asset, sig.side, equity)
                 size = compute_position_size(
+                    method=PositionSizingMethod.EDGE_WEIGHTED,
                     net_edge=sig.gross_edge,
                     min_edge=min_edge,
                     model_confidence=sig.confidence,
                     realized_vol=getattr(row, "realized_vol", 0.5) or 0.5,
                     available_liquidity_usd=liq_usd,
                     correlated_exposure_pct=corr_exp,
+                    portfolio_value=equity,
                     base_size_usd=100.0,
                     max_size_usd=500.0,
                 )
