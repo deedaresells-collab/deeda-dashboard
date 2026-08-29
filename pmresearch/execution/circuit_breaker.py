@@ -1,0 +1,74 @@
+"""Portfolio circuit breaker — halt trading on risk breaches."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Any
+
+
+@dataclass
+class CircuitBreakerConfig:
+    per_position_risk_limit_pct: float = 0.15
+    correlated_exposure_limit_pct: float = 0.30
+    daily_loss_limit_pct: float = 0.05
+    max_portfolio_drawdown_pct: float = 0.15
+
+
+@dataclass
+class CircuitBreakerState:
+    config: CircuitBreakerConfig
+    initial_capital: float
+    peak_equity: float = 0.0
+    current_equity: float = 0.0
+    daily_pnl: dict[date, float] = field(default_factory=dict)
+    triggered: bool = False
+    trigger_reason: str = ""
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.peak_equity = self.initial_capital
+        self.current_equity = self.initial_capital
+
+    def update_equity(self, equity: float, trade_date: date) -> None:
+        self.current_equity = equity
+        self.peak_equity = max(self.peak_equity, equity)
+        if self.triggered:
+            return
+
+        drawdown = (equity - self.peak_equity) / self.peak_equity if self.peak_equity > 0 else 0
+        if drawdown < -self.config.max_portfolio_drawdown_pct:
+            self._trigger(
+                "max_portfolio_drawdown",
+                {"drawdown": drawdown, "equity": equity, "peak": self.peak_equity},
+            )
+            return
+
+        day_pnl = self.daily_pnl.get(trade_date, 0.0)
+        if day_pnl < -self.config.daily_loss_limit_pct * self.initial_capital:
+            self._trigger(
+                "daily_loss_limit",
+                {"daily_pnl": day_pnl, "date": str(trade_date)},
+            )
+
+    def record_pnl(self, pnl: float, trade_date: date) -> None:
+        self.daily_pnl[trade_date] = self.daily_pnl.get(trade_date, 0.0) + pnl
+
+    def _trigger(self, reason: str, details: dict) -> None:
+        self.triggered = True
+        self.trigger_reason = reason
+        self.diagnostics.append({"reason": reason, **details})
+
+    def can_trade(self) -> bool:
+        return not self.triggered
+
+    def diagnostic_report(self) -> dict[str, Any]:
+        return {
+            "triggered": self.triggered,
+            "trigger_reason": self.trigger_reason,
+            "peak_equity": self.peak_equity,
+            "current_equity": self.current_equity,
+            "drawdown": (self.current_equity - self.peak_equity) / self.peak_equity if self.peak_equity else 0,
+            "daily_pnl": {str(k): v for k, v in self.daily_pnl.items()},
+            "diagnostics": self.diagnostics,
+        }

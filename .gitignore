@@ -3,3 +3,9 @@
 server.out.log
 server.err.log
 node_modules/
+data/*.duckdb
+data/*.duckdb.wal
+reports/output/
+__pycache__/
+*.pyc
+.pytest_cache/

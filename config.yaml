@@ -1,0 +1,114 @@
+assets:
+  - BTC
+  - ETH
+
+durations_minutes:
+  - 5
+  - 15
+  - 60
+
+exchanges:
+  - coinbase
+  - binance
+  - kraken
+
+database:
+  path: data/market_research.duckdb
+
+backtest:
+  train_pct: 0.60
+  validation_pct: 0.20
+  test_pct: 0.20
+  initial_capital: 10000.0
+  exchange_fee_pct: 0.001
+  slippage_bps: 5.0
+  min_liquidity_usd: 50.0
+
+strategy_a:
+  minimum_edge_thresholds:
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.04
+    - 0.05
+    - 0.075
+    - 0.10
+
+strategy_b:
+  lags_ms:
+    - 250
+    - 500
+    - 1000
+    - 2000
+    - 3000
+    - 5000
+    - 10000
+    - 30000
+
+strategy_c:
+  spreads_cents:
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.04
+    - 0.05
+
+position_sizes_usd:
+  - 10
+  - 25
+  - 50
+  - 100
+  - 250
+  - 500
+  - 1000
+  - 2500
+
+monte_carlo:
+  simulations: 10000
+
+regime:
+  min_edge: 0.02
+  z_threshold: 1.5
+  persistence_threshold: 0.5
+  daily_loss_limit_pct: 0.05
+  max_drawdown_pct: 0.15
+  correlated_exposure_limit_pct: 0.30
+  per_asset_limit_pct: 0.25
+  uncertainty_buffer: 0.01
+  ma_window: 20
+  uncertain_mode: fair_value
+
+risk:
+  position_sizing_method: EDGE_WEIGHTED  # FIXED_SIZE | FIXED_FRACTION | EDGE_WEIGHTED
+  base_size_usd: 100.0
+  max_size_usd: 500.0
+  fixed_fraction: 0.01
+  max_position_risk_pct: 0.15
+  max_asset_exposure_pct: 0.25
+  max_directional_crypto_exposure_pct: 0.30
+  max_total_portfolio_exposure_pct: 0.50
+  daily_loss_limit_pct: 0.05
+  max_drawdown_pct: 0.15
+  max_consecutive_losses: 10
+
+calibration_buckets:
+  - [0.0, 0.10]
+  - [0.10, 0.20]
+  - [0.20, 0.30]
+  - [0.30, 0.40]
+  - [0.40, 0.50]
+  - [0.50, 0.60]
+  - [0.60, 0.70]
+  - [0.70, 0.80]
+  - [0.80, 0.90]
+  - [0.90, 1.00]
+
+edge_buckets:
+  - [0.0, 0.01]
+  - [0.01, 0.02]
+  - [0.02, 0.03]
+  - [0.03, 0.04]
+  - [0.04, 0.05]
+  - [0.05, 0.075]
+  - [0.075, 0.10]
+  - [0.10, 1.00]
