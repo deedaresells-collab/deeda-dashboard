@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Main CLI for prediction-market research platform."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from pmresearch.backtests.engine import BacktestEngine
+from pmresearch.collectors.demo_data import generate_demo_dataset
+from pmresearch.config import ROOT, load_config
+from pmresearch.data.loader import load_merged_snapshots
+from pmresearch.data.storage import Database
+from pmresearch.reports.calibration import calibration_table, edge_bucket_analysis, plot_calibration
+from pmresearch.reports.monte_carlo import monte_carlo_monthly, scalability_targets
+from pmresearch.reports.summary import generate_results_summary, save_backtest_results
+
+
+def cmd_generate_demo(args: argparse.Namespace) -> None:
+    config = load_config()
+    db = Database(config.database_path)
+    stats = generate_demo_dataset(db, n_days=args.days, seed=args.seed)
+    print(f"Generated demo dataset: {json.dumps(stats, indent=2)}")
+    db.close()
+
+
+def cmd_backtest(args: argparse.Namespace) -> None:
+    config = load_config()
+    db = Database(config.database_path)
+
+    if db.count_rows("prediction_snapshots") == 0:
+        print("No data found. Generating demo dataset...")
+        stats = generate_demo_dataset(db, n_days=30)
+        print(f"Generated: {stats}")
+        data_type = "SYNTHETIC_DEMO"
+    else:
+        data_type = args.data_type
+
+    df = load_merged_snapshots(db)
+    if df.empty:
+        print("ERROR: No merged snapshots available.")
+        sys.exit(1)
+
+    print(f"Loaded {len(df)} merged snapshots across {df['market_id'].nunique()} markets")
+
+    engine = BacktestEngine(config)
+    results = engine.run_full_backtest(df)
+
+    # Calibration on test set prepared data
+    prepared = engine.prepare_data(df)
+    _, _, test = __import__("pmresearch.data.loader", fromlist=["chronological_split"]).chronological_split(
+        prepared, train_pct=config.train_pct, val_pct=config.validation_pct
+    )
+    # One row per market for calibration (last snapshot before expiry)
+    cal_df = test.sort_values("timestamp").groupby("market_id").last().reset_index()
+    cal_table = calibration_table(cal_df)
+    cal_chart_path = ROOT / "reports" / "output" / "calibration_chart.png"
+    plot_calibration(cal_table, cal_chart_path)
+
+    test_trades = results.get("test_trades_a", __import__("pandas").DataFrame())
+    edge_df = edge_bucket_analysis(test_trades)
+    mc = monte_carlo_monthly(test_trades, n_simulations=config.monte_carlo_simulations)
+    scale = scalability_targets(test_trades)
+
+    out_path = save_backtest_results(results)
+    summary = generate_results_summary(
+        results, cal_table, edge_df, mc, scale, data_type=data_type
+    )
+
+    print(f"\nBacktest complete. Results saved to {out_path}")
+    print(f"Summary written to {ROOT / 'results_summary.md'}")
+    print("\n--- Test Set Highlights (Strategy A) ---")
+    test_m = results["strategies"]["A_fair_value"]["test"]
+    for k in ["num_trades", "net_profit", "sharpe_ratio", "max_drawdown", "realized_edge"]:
+        print(f"  {k}: {test_m.get(k)}")
+
+    db.close()
+
+
+def cmd_import_crypto(args: argparse.Namespace) -> None:
+    from pmresearch.collectors.crypto_exchanges import SYMBOL_MAP, fetch_binance_klines, klines_to_crypto_snapshots
+
+    config = load_config()
+    db = Database(config.database_path)
+    for asset in args.assets:
+        symbol = SYMBOL_MAP.get(asset, f"{asset}USDT")
+        print(f"Fetching {symbol} klines...")
+        klines = fetch_binance_klines(symbol, interval="1m", limit=args.limit)
+        snapshots = klines_to_crypto_snapshots(klines, asset)
+        snapshots["snapshot_id"] = range(1, len(snapshots) + 1)
+        db.insert_df("crypto_snapshots", snapshots)
+        print(f"  Imported {len(snapshots)} snapshots for {asset}")
+    db.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Prediction Market Research Platform")
+    sub = parser.add_subparsers(dest="command")
+
+    gen = sub.add_parser("generate-demo", help="Generate synthetic demo data for pipeline testing")
+    gen.add_argument("--days", type=int, default=30)
+    gen.add_argument("--seed", type=int, default=42)
+    gen.set_defaults(func=cmd_generate_demo)
+
+    bt = sub.add_parser("backtest", help="Run full baseline backtest")
+    bt.add_argument("--data-type", default="SYNTHETIC_DEMO", help="Label for data provenance")
+    bt.set_defaults(func=cmd_backtest)
+
+    imp = sub.add_parser("import-crypto", help="Import real crypto klines from Binance")
+    imp.add_argument("--assets", nargs="+", default=["BTC", "ETH"])
+    imp.add_argument("--limit", type=int, default=500)
+    imp.set_defaults(func=cmd_import_crypto)
+
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        sys.exit(0)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
